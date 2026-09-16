@@ -7,22 +7,23 @@ const API_BASE = import.meta.env.VITE_API_BASE_URL;
 function App() {
   const [riskData, setRiskData] = useState([]);
   const [redistribution, setRedistribution] = useState([]);
+  const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [expandedRow, setExpandedRow] = useState(null);
-  const [stats, setStats] = useState(null);
+  const [typeFilter, setTypeFilter] = useState("All");
 
   useEffect(() => {
     async function loadData() {
       try {
         const [riskRes, redisRes, statsRes] = await Promise.all([
-  axios.get(`${API_BASE}/risk/ranked?limit=20`),
-  axios.get(`${API_BASE}/redistribution/recommendations?limit=20`),
-  axios.get(`${API_BASE}/stats/summary`),
-]);
-setRiskData(riskRes.data);
-setRedistribution(redisRes.data);
-setStats(statsRes.data);
+          axios.get(`${API_BASE}/risk/ranked?limit=200`),
+          axios.get(`${API_BASE}/redistribution/recommendations?limit=20`),
+          axios.get(`${API_BASE}/stats/summary`),
+        ]);
+        setRiskData(riskRes.data);
+        setRedistribution(redisRes.data);
+        setStats(statsRes.data);
       } catch (err) {
         setError("Could not load data. Backend may be waking up (free tier) — try refreshing in 30s.");
       } finally {
@@ -35,6 +36,11 @@ setStats(statsRes.data);
   if (loading) return <div className="status-message">Loading dashboard data...</div>;
   if (error) return <div className="status-message error">{error}</div>;
 
+  const filteredRiskData = (typeFilter === "All"
+  ? riskData
+  : riskData.filter((row) => row.facility_type === typeFilter)
+).slice(0, 20);
+
   return (
     <div className="dashboard">
       <header>
@@ -43,29 +49,42 @@ setStats(statsRes.data);
       </header>
 
       {stats && (
-  <div className="stats-grid">
-    <div className="stat-card">
-      <div className="stat-value">{stats.total_facilities.toLocaleString()}</div>
-      <div className="stat-label">Facilities Monitored</div>
-    </div>
-    <div className="stat-card">
-      <div className="stat-value">{stats.total_states}</div>
-      <div className="stat-label">States Covered</div>
-    </div>
-    <div className="stat-card">
-      <div className="stat-value">{stats.total_districts}</div>
-      <div className="stat-label">Districts</div>
-    </div>
-    <div className="stat-card stat-critical">
-      <div className="stat-value">{stats.facilities_with_critical_stock.toLocaleString()}</div>
-      <div className="stat-label">Facilities with Critical Stock</div>
-    </div>
-    <div className="stat-card stat-critical">
-      <div className="stat-value">{stats.critical_stock_records.toLocaleString()}</div>
-      <div className="stat-label">Critical Stock Alerts</div>
-    </div>
-  </div>
-)}
+        <div className="stats-grid">
+          <div className="stat-card">
+            <div className="stat-value">{stats.total_facilities.toLocaleString()}</div>
+            <div className="stat-label">Facilities Monitored</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-value">{stats.total_states}</div>
+            <div className="stat-label">States Covered</div>
+          </div>
+          <div className="stat-card">
+            <div className="stat-value">{stats.total_districts}</div>
+            <div className="stat-label">Districts</div>
+          </div>
+          <div className="stat-card stat-critical">
+            <div className="stat-value">{stats.facilities_with_critical_stock.toLocaleString()}</div>
+            <div className="stat-label">Facilities with Critical Stock</div>
+          </div>
+          <div className="stat-card stat-critical">
+            <div className="stat-value">{stats.critical_stock_records.toLocaleString()}</div>
+            <div className="stat-label">Critical Stock Alerts</div>
+          </div>
+        </div>
+      )}
+
+      <div className="filter-bar">
+        <span>Filter by facility type:</span>
+        {["All", "PHC", "CHC", "District Hospital"].map((type) => (
+          <button
+            key={type}
+            className={`filter-btn ${typeFilter === type ? "active" : ""}`}
+            onClick={() => setTypeFilter(type)}
+          >
+            {type}
+          </button>
+        ))}
+      </div>
 
       <section>
         <h2>Top Risk-Ranked Stock Issues</h2>
@@ -81,28 +100,28 @@ setStats(statsRes.data);
             </tr>
           </thead>
           <tbody>
-  {riskData.map((row, i) => (
-    <>
-      <tr
-        key={i}
-        className={`risk-${row.stock_status.toLowerCase()} clickable-row`}
-        onClick={() => setExpandedRow(expandedRow === i ? null : i)}
-      >
-        <td>{row.facility_name}</td>
-        <td>{row.district}, {row.state}</td>
-        <td>{row.medicine_name}</td>
-        <td>{row.current_quantity} / {row.reorder_threshold}</td>
-        <td><span className={`badge badge-${row.stock_status.toLowerCase()}`}>{row.stock_status}</span></td>
-        <td>{row.risk_score}</td>
-      </tr>
-      {expandedRow === i && (
-        <tr className="explanation-row">
-          <td colSpan={6}>{row.risk_explanation}</td>
-        </tr>
-      )}
-    </>
-  ))}
-</tbody>
+            {filteredRiskData.map((row, i) => (
+              <>
+                <tr
+                  key={i}
+                  className={`risk-${row.stock_status.toLowerCase()} clickable-row`}
+                  onClick={() => setExpandedRow(expandedRow === i ? null : i)}
+                >
+                  <td>{row.facility_name}</td>
+                  <td>{row.district}, {row.state}</td>
+                  <td>{row.medicine_name}</td>
+                  <td>{row.current_quantity} / {row.reorder_threshold}</td>
+                  <td><span className={`badge badge-${row.stock_status.toLowerCase()}`}>{row.stock_status}</span></td>
+                  <td>{row.risk_score}</td>
+                </tr>
+                {expandedRow === i && (
+                  <tr className="explanation-row">
+                    <td colSpan={6}>{row.risk_explanation}</td>
+                  </tr>
+                )}
+              </>
+            ))}
+          </tbody>
         </table>
       </section>
 
